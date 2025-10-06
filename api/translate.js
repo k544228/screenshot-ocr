@@ -12,7 +12,7 @@
  * Body: { "content": "Text to translate..." }
  */
 
-import { GeminiTranslator } from '../lib/translator.js';
+import { OpenAITranslator } from '../lib/translator.js';
 import { extractContent, isValidUrl, normalizeUrl } from '../lib/content-extractor.js';
 
 export default async function handler(req, res) {
@@ -74,17 +74,17 @@ export default async function handler(req, res) {
     }
 
     // 驗證 API 金鑰
-    const apiKey = process.env.GOOGLE_API_KEY;
+    const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
       return res.status(500).json({
         success: false,
-        error: '伺服器配置錯誤：缺少 GOOGLE_API_KEY'
+        error: '伺服器配置錯誤：缺少 OPENAI_API_KEY'
       });
     }
 
     // 執行翻譯
     console.log(`開始翻譯（長度: ${textToTranslate.length} 字元）`);
-    const translator = new GeminiTranslator(apiKey);
+    const translator = new OpenAITranslator(apiKey);
 
     let translation;
     // 如果文章很長，使用分段翻譯

@@ -4,7 +4,7 @@
  */
 
 import 'dotenv/config';
-import { ClaudeTranslator } from '../lib/translator.js';
+import { OpenAITranslator } from '../lib/translator.js';
 import { extractContent } from '../lib/content-extractor.js';
 
 // 測試文本
@@ -26,7 +26,7 @@ async function testDirectTranslation() {
   console.log('='.repeat(50));
 
   try {
-    const translator = new ClaudeTranslator();
+    const translator = new OpenAITranslator();
     console.log('開始翻譯...');
 
     const translation = await translator.translate(TEST_CONTENT, {
@@ -96,7 +96,7 @@ async function testFullWorkflow() {
 
     // 步驟 2: 翻譯
     console.log('步驟 2/2: 翻譯成繁體中文...');
-    const translator = new ClaudeTranslator();
+    const translator = new OpenAITranslator();
 
     const fullText = `# ${extracted.title}\n\n${extracted.content}`;
     let translation;
@@ -138,14 +138,14 @@ async function runTests() {
   console.log('開始時間:', new Date().toLocaleString('zh-TW'));
 
   // 檢查 API 金鑰
-  if (!process.env.ANTHROPIC_API_KEY) {
-    console.error('\n❌ 錯誤: 未設定 ANTHROPIC_API_KEY 環境變數');
-    console.error('請在 .env 文件中設定你的 Claude API 金鑰\n');
+  if (!process.env.OPENAI_API_KEY) {
+    console.error('\n❌ 錯誤: 未設定 OPENAI_API_KEY 環境變數');
+    console.error('請在 .env 文件中設定你的 OpenAI API 金鑰\n');
     process.exit(1);
   }
 
   console.log('✓ API 金鑰已設定');
-  console.log('✓ 使用模型:', process.env.CLAUDE_MODEL || 'claude-sonnet-4-20250514');
+  console.log('✓ 使用模型:', process.env.OPENAI_MODEL || 'gpt-4o-mini');
 
   // 選擇測試
   const args = process.argv.slice(2);
