@@ -1,0 +1,31 @@
+{
+  "name": "perplexity-translator",
+  "version": "1.0.0",
+  "description": "Perplexity 文章翻譯服務 - 使用 Claude API 將英文文章翻譯成繁體中文",
+  "type": "module",
+  "main": "api/translate.js",
+  "scripts": {
+    "dev": "node test/local-server.js",
+    "test": "node test/test-translate.js",
+    "deploy": "vercel --prod"
+  },
+  "keywords": [
+    "translation",
+    "claude-api",
+    "perplexity",
+    "traditional-chinese",
+    "ios-shortcut"
+  ],
+  "author": "KEN",
+  "license": "MIT",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.1",
+    "dotenv": "^16.4.7"
+  },
+  "devDependencies": {
+    "node-fetch": "^3.3.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
