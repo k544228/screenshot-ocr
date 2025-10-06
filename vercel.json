@@ -13,8 +13,8 @@
     }
   ],
   "env": {
-    "ANTHROPIC_API_KEY": "@anthropic_api_key",
-    "CLAUDE_MODEL": "claude-sonnet-4-20250514",
+    "GOOGLE_API_KEY": "@google_api_key",
+    "GEMINI_MODEL": "gemini-1.5-flash",
     "TRANSLATION_MAX_TOKENS": "4000",
     "TRANSLATION_TEMPERATURE": "0.3"
   }
