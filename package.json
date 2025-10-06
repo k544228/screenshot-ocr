@@ -1,18 +1,20 @@
 {
-  "name": "perplexity-translator",
-  "version": "1.0.0",
-  "description": "Perplexity 文章翻譯服務 - 使用 Claude API 將英文文章翻譯成繁體中文",
+  "name": "perplexity-ocr",
+  "version": "2.0.0",
+  "description": "截圖文字提取服務 - 使用 GPT-4o Vision 從截圖中提取文字內容",
   "type": "module",
-  "main": "api/translate.js",
+  "main": "api/ocr.js",
   "scripts": {
     "dev": "node test/local-server.js",
     "test": "node test/test-translate.js",
+    "test:ocr": "node test/test-ocr.js",
     "deploy": "vercel --prod"
   },
   "keywords": [
-    "translation",
-    "claude-api",
-    "perplexity",
+    "ocr",
+    "screenshot",
+    "text-extraction",
+    "gpt-4o-vision",
     "traditional-chinese",
     "ios-shortcut"
   ],
