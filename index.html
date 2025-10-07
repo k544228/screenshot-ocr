@@ -99,10 +99,50 @@
         }
 
         .images-preview {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .images-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .add-more-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9em;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            transition: all 0.3s ease;
+        }
+
+        .add-more-btn:hover {
+            background: #764ba2;
+            transform: translateY(-2px);
+        }
+
+        .images-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
             gap: 15px;
-            margin-bottom: 20px;
+            grid-auto-flow: row;
+        }
+
+        @media (max-width: 600px) {
+            .images-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
         }
 
         .image-item {
@@ -871,13 +911,31 @@
         function renderImagePreviews() {
             imagesPreview.innerHTML = '';
 
-            // 添加圖片數量提示
+            // 添加頂部標題和追加按鈕
             if (selectedFiles.length > 0) {
+                const headerDiv = document.createElement('div');
+                headerDiv.className = 'images-header';
+
                 const countDiv = document.createElement('div');
                 countDiv.className = 'images-count';
                 countDiv.textContent = `已選擇 ${selectedFiles.length} 張圖片（可拖動調整順序）`;
-                imagesPreview.appendChild(countDiv);
+
+                const addMoreBtn = document.createElement('button');
+                addMoreBtn.className = 'add-more-btn';
+                addMoreBtn.innerHTML = '➕ 追加圖片';
+                addMoreBtn.onclick = () => {
+                    imageInput.click();
+                };
+
+                headerDiv.appendChild(countDiv);
+                headerDiv.appendChild(addMoreBtn);
+                imagesPreview.appendChild(headerDiv);
             }
+
+            // 創建圖片網格容器
+            const gridDiv = document.createElement('div');
+            gridDiv.className = 'images-grid';
+            gridDiv.id = 'imagesGrid';
 
             selectedFiles.forEach((file, index) => {
                 const reader = new FileReader();
@@ -911,10 +969,12 @@
                         removeImage(parseInt(e.target.dataset.index));
                     });
 
-                    imagesPreview.appendChild(itemDiv);
+                    gridDiv.appendChild(itemDiv);
                 };
                 reader.readAsDataURL(file);
             });
+
+            imagesPreview.appendChild(gridDiv);
 
             // 顯示/隱藏結果顯示模式選項（僅多張圖片時顯示）
             const resultModeOptions = document.getElementById('resultModeOptions');
