@@ -261,13 +261,22 @@
         }
 
         .language-selector {
-            margin-top: 15px;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 2px dashed #e0e0e0;
+        }
+
+        .language-selector-title {
+            display: block;
+            margin-bottom: 12px;
+            color: #666;
+            font-weight: 600;
+            font-size: 0.9em;
         }
 
         .language-group {
             display: flex;
             gap: 15px;
-            margin-top: 10px;
         }
 
         .language-field {
@@ -412,7 +421,8 @@
                     <option value="openai">OpenAI 翻譯（更準確，消耗 API）</option>
                 </select>
 
-                <div class="language-selector" id="languageSelector" style="display: none;">
+                <div class="language-selector" id="languageSelector">
+                    <label class="language-selector-title">🔄 語言設定</label>
                     <div class="language-group">
                         <div class="language-field">
                             <label class="language-field-label">從</label>
@@ -544,12 +554,6 @@
                 dropdown.appendChild(option);
             });
         }
-
-        // 翻譯選項改變
-        translateSelect.addEventListener('change', () => {
-            const showLanguages = translateSelect.value !== 'none';
-            languageSelector.style.display = showLanguages ? 'block' : 'none';
-        });
 
         // 來源語言選擇器
         sourceLangSearch.addEventListener('click', () => {
