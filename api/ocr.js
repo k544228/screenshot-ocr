@@ -1,16 +1,19 @@
 /**
  * Vercel Serverless Function
- * API 端點：從截圖中提取文字
+ * API 端點：從截圖中提取文字並可選翻譯
  *
  * 使用方式：
  * POST /api/ocr
- * Body: { "image": "base64_encoded_image_or_url" }
- *
- * 或上傳多張圖片：
- * Body: { "images": ["image1", "image2", ...] }
+ * Body: {
+ *   "image": "base64_encoded_image_or_url",
+ *   "translate": "google" | "openai" | "none",
+ *   "targetLanguage": "zh-TW" | "en" | ...
+ * }
  */
 
 import { OCRExtractor } from '../lib/ocr.js';
+import { GoogleTranslatorFree } from '../lib/translator-google.js';
+import { OpenAITranslator } from '../lib/translator.js';
 
 export default async function handler(req, res) {
   // 設置 CORS
@@ -32,7 +35,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { image, images, options = {} } = req.body;
+    const { image, images, translate = 'none', targetLanguage = 'zh-TW', options = {} } = req.body;
 
     // 驗證輸入
     if (!image && !images) {
@@ -73,14 +76,49 @@ export default async function handler(req, res) {
 
     console.log(`OCR 完成（提取 ${extractedText.length} 字元）`);
 
+    // 翻譯處理
+    let translatedText = null;
+    let translationMethod = 'none';
+
+    if (translate && translate !== 'none') {
+      console.log(`開始翻譯（使用 ${translate}）...`);
+
+      try {
+        if (translate === 'google') {
+          const translator = new GoogleTranslatorFree();
+          if (extractedText.length > 5000) {
+            translatedText = await translator.translateLongText(extractedText);
+          } else {
+            translatedText = await translator.translate(extractedText, { targetLanguage });
+          }
+          translationMethod = 'google';
+        } else if (translate === 'openai') {
+          const translator = new OpenAITranslator(apiKey);
+          const prompt = `請將以下文字翻譯成繁體中文，保持原始格式：\n\n${extractedText}`;
+          translatedText = await translator.translate(prompt, { preserveFormatting: true });
+          translationMethod = 'openai';
+        }
+
+        console.log(`翻譯完成（${translatedText?.length || 0} 字元）`);
+      } catch (error) {
+        console.error('翻譯錯誤:', error);
+        // 翻譯失敗不影響整體流程，返回原文
+        translatedText = null;
+      }
+    }
+
     // 返回結果
     return res.status(200).json({
       success: true,
       data: {
-        text: extractedText,
+        originalText: extractedText,
+        translatedText: translatedText,
+        text: translatedText || extractedText, // 優先返回翻譯文字
         stats: {
           imageCount,
-          textLength: extractedText.length,
+          originalTextLength: extractedText.length,
+          translatedTextLength: translatedText?.length || 0,
+          translationMethod,
           extractedAt: new Date().toISOString()
         }
       }

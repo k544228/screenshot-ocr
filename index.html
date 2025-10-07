@@ -223,6 +223,43 @@
             display: none;
         }
 
+        .translate-options {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9ff;
+            border-radius: 10px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .translate-label {
+            display: block;
+            margin-bottom: 10px;
+            color: #333;
+            font-weight: 600;
+            font-size: 0.95em;
+        }
+
+        .translate-select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            font-size: 1em;
+            background: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .translate-select:hover {
+            border-color: #764ba2;
+        }
+
+        .translate-select:focus {
+            outline: none;
+            border-color: #764ba2;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
         @media (max-width: 600px) {
             .container {
                 padding: 20px;
@@ -252,6 +289,16 @@
 
         <div class="preview-container" id="previewContainer">
             <img id="previewImage" class="preview-image" alt="預覽圖片">
+
+            <div class="translate-options">
+                <label class="translate-label">🌐 翻譯選項</label>
+                <select class="translate-select" id="translateSelect">
+                    <option value="google">Google 翻譯（免費，推薦）</option>
+                    <option value="none">不翻譯</option>
+                    <option value="openai">OpenAI 翻譯（更準確，消耗 API）</option>
+                </select>
+            </div>
+
             <div class="button-group">
                 <button class="btn-primary" id="extractBtn">🔍 提取文字</button>
                 <button class="btn-secondary" id="cancelBtn">✕ 取消</button>
@@ -284,6 +331,7 @@
         const imageInput = document.getElementById('imageInput');
         const previewContainer = document.getElementById('previewContainer');
         const previewImage = document.getElementById('previewImage');
+        const translateSelect = document.getElementById('translateSelect');
         const extractBtn = document.getElementById('extractBtn');
         const cancelBtn = document.getElementById('cancelBtn');
         const loading = document.getElementById('loading');
@@ -364,33 +412,54 @@
         extractBtn.addEventListener('click', async () => {
             if (!selectedFile) return;
 
+            const translateOption = translateSelect.value;
             extractBtn.disabled = true;
             loading.style.display = 'block';
             resultContainer.style.display = 'none';
             hideMessages();
+
+            // 更新加載文字
+            const loadingText = document.querySelector('.loading-text');
+            if (translateOption !== 'none') {
+                loadingText.textContent = '正在提取並翻譯文字...';
+            } else {
+                loadingText.textContent = '正在提取文字...';
+            }
 
             try {
                 // 轉換為 Base64
                 const base64 = await fileToBase64(selectedFile);
                 const base64Data = base64.split(',')[1]; // 移除 data:image/...;base64, 前綴
 
-                // 調用 API
+                // 調用 API，包含翻譯選項
                 const response = await fetch('/api/ocr', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                        image: base64Data
+                        image: base64Data,
+                        translate: translateOption,
+                        targetLanguage: 'zh-TW'
                     })
                 });
 
                 const data = await response.json();
 
                 if (data.success) {
-                    // 顯示結果
+                    // 顯示結果（優先顯示翻譯文字）
                     resultText.textContent = data.data.text;
-                    resultStats.textContent = `${data.data.stats.textLength} 字元`;
+
+                    // 顯示統計信息
+                    let statsText = '';
+                    if (data.data.stats.translationMethod && data.data.stats.translationMethod !== 'none') {
+                        const method = data.data.stats.translationMethod === 'google' ? 'Google 翻譯' : 'OpenAI 翻譯';
+                        statsText = `${data.data.stats.translatedTextLength} 字元 (${method})`;
+                    } else {
+                        statsText = `${data.data.stats.originalTextLength} 字元`;
+                    }
+                    resultStats.textContent = statsText;
+
                     resultContainer.style.display = 'block';
                     loading.style.display = 'none';
                 } else {
