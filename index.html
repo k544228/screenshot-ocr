@@ -91,11 +91,77 @@
             display: none;
         }
 
-        .preview-image {
-            max-width: 100%;
-            border-radius: 10px;
+        .images-preview {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 15px;
             margin-bottom: 20px;
+        }
+
+        .image-item {
+            position: relative;
+            border-radius: 10px;
+            overflow: hidden;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            cursor: move;
+            transition: transform 0.2s ease;
+        }
+
+        .image-item:hover {
+            transform: scale(1.05);
+        }
+
+        .image-item.dragging {
+            opacity: 0.5;
+        }
+
+        .image-item img {
+            width: 100%;
+            height: 150px;
+            object-fit: cover;
+        }
+
+        .image-order {
+            position: absolute;
+            top: 5px;
+            left: 5px;
+            background: rgba(102, 126, 234, 0.9);
+            color: white;
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+
+        .image-remove {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: rgba(255, 68, 68, 0.9);
+            color: white;
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .image-remove:hover {
+            background: rgba(255, 68, 68, 1);
+        }
+
+        .images-count {
+            text-align: center;
+            color: #666;
+            font-size: 0.9em;
+            margin-bottom: 15px;
         }
 
         .button-group {
@@ -406,12 +472,12 @@
         <div class="upload-area" id="uploadArea">
             <div class="upload-icon">📤</div>
             <div class="upload-text">點擊或拖放截圖到這裡</div>
-            <div class="upload-hint">支持 PNG、JPG、JPEG 格式</div>
-            <input type="file" id="imageInput" accept="image/png,image/jpeg,image/jpg">
+            <div class="upload-hint">支持 PNG、JPG、JPEG 格式（最多 10 張）</div>
+            <input type="file" id="imageInput" accept="image/png,image/jpeg,image/jpg" multiple>
         </div>
 
         <div class="preview-container" id="previewContainer">
-            <img id="previewImage" class="preview-image" alt="預覽圖片">
+            <div class="images-preview" id="imagesPreview"></div>
 
             <div class="translate-options">
                 <label class="translate-label">🌐 翻譯選項</label>
@@ -500,7 +566,7 @@
         const uploadArea = document.getElementById('uploadArea');
         const imageInput = document.getElementById('imageInput');
         const previewContainer = document.getElementById('previewContainer');
-        const previewImage = document.getElementById('previewImage');
+        const imagesPreview = document.getElementById('imagesPreview');
         const translateSelect = document.getElementById('translateSelect');
         const languageSelector = document.getElementById('languageSelector');
         const sourceLangSearch = document.getElementById('sourceLangSearch');
@@ -518,9 +584,10 @@
         const errorDiv = document.getElementById('error');
         const successDiv = document.getElementById('success');
 
-        let selectedFile = null;
+        let selectedFiles = [];
         let selectedSourceLang = 'auto';
         let selectedTargetLang = 'zh-TW';
+        const MAX_IMAGES = 10;
 
         // 語言搜尋功能
         function searchLanguages(query) {
@@ -554,6 +621,12 @@
                 dropdown.appendChild(option);
             });
         }
+
+        // 翻譯選項改變時控制語言設定顯示
+        translateSelect.addEventListener('change', () => {
+            const showLanguages = translateSelect.value !== 'none';
+            languageSelector.style.display = showLanguages ? 'block' : 'none';
+        });
 
         // 來源語言選擇器
         sourceLangSearch.addEventListener('click', () => {
@@ -628,7 +701,7 @@
 
         // 文件選擇
         imageInput.addEventListener('change', (e) => {
-            handleFile(e.target.files[0]);
+            handleFiles(Array.from(e.target.files));
         });
 
         // 拖放功能
@@ -644,27 +717,121 @@
         uploadArea.addEventListener('drop', (e) => {
             e.preventDefault();
             uploadArea.classList.remove('dragover');
-            handleFile(e.dataTransfer.files[0]);
+            handleFiles(Array.from(e.dataTransfer.files));
         });
 
-        // 處理文件
-        function handleFile(file) {
-            if (!file) return;
+        // 處理多個文件
+        function handleFiles(files) {
+            // 過濾圖片文件
+            const imageFiles = files.filter(file => file.type.match('image/(png|jpeg|jpg)'));
 
-            if (!file.type.match('image/(png|jpeg|jpg)')) {
+            if (imageFiles.length === 0) {
                 showError('請選擇 PNG 或 JPG 格式的圖片');
                 return;
             }
 
-            selectedFile = file;
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                previewImage.src = e.target.result;
-                uploadArea.style.display = 'none';
-                previewContainer.style.display = 'block';
-                hideMessages();
-            };
-            reader.readAsDataURL(file);
+            // 限制最多10張
+            const totalFiles = selectedFiles.length + imageFiles.length;
+            if (totalFiles > MAX_IMAGES) {
+                showError(`最多只能選擇 ${MAX_IMAGES} 張圖片`);
+                return;
+            }
+
+            // 添加到已選文件
+            selectedFiles = [...selectedFiles, ...imageFiles];
+
+            // 顯示預覽
+            renderImagePreviews();
+            uploadArea.style.display = 'none';
+            previewContainer.style.display = 'block';
+            hideMessages();
+        }
+
+        // 渲染圖片預覽
+        function renderImagePreviews() {
+            imagesPreview.innerHTML = '';
+
+            // 添加圖片數量提示
+            if (selectedFiles.length > 0) {
+                const countDiv = document.createElement('div');
+                countDiv.className = 'images-count';
+                countDiv.textContent = `已選擇 ${selectedFiles.length} 張圖片（可拖動調整順序）`;
+                imagesPreview.appendChild(countDiv);
+            }
+
+            selectedFiles.forEach((file, index) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const itemDiv = document.createElement('div');
+                    itemDiv.className = 'image-item';
+                    itemDiv.draggable = true;
+                    itemDiv.dataset.index = index;
+
+                    itemDiv.innerHTML = `
+                        <img src="${e.target.result}" alt="圖片 ${index + 1}">
+                        <div class="image-order">${index + 1}</div>
+                        <div class="image-remove" data-index="${index}">✕</div>
+                    `;
+
+                    // 拖放事件
+                    itemDiv.addEventListener('dragstart', handleDragStart);
+                    itemDiv.addEventListener('dragover', handleDragOver);
+                    itemDiv.addEventListener('drop', handleDrop);
+                    itemDiv.addEventListener('dragend', handleDragEnd);
+
+                    // 刪除按鈕
+                    itemDiv.querySelector('.image-remove').addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        removeImage(parseInt(e.target.dataset.index));
+                    });
+
+                    imagesPreview.appendChild(itemDiv);
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        // 拖放排序
+        let draggedElement = null;
+
+        function handleDragStart(e) {
+            draggedElement = e.currentTarget;
+            e.currentTarget.classList.add('dragging');
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            const dropTarget = e.currentTarget;
+
+            if (draggedElement !== dropTarget) {
+                const dragIndex = parseInt(draggedElement.dataset.index);
+                const dropIndex = parseInt(dropTarget.dataset.index);
+
+                // 交換位置
+                const temp = selectedFiles[dragIndex];
+                selectedFiles[dragIndex] = selectedFiles[dropIndex];
+                selectedFiles[dropIndex] = temp;
+
+                renderImagePreviews();
+            }
+        }
+
+        function handleDragEnd(e) {
+            e.currentTarget.classList.remove('dragging');
+        }
+
+        // 刪除圖片
+        function removeImage(index) {
+            selectedFiles.splice(index, 1);
+            if (selectedFiles.length === 0) {
+                resetUI();
+            } else {
+                renderImagePreviews();
+            }
         }
 
         // 取消按鈕
@@ -675,7 +842,7 @@
 
         // 重置界面
         function resetUI() {
-            selectedFile = null;
+            selectedFiles = [];
             imageInput.value = '';
             uploadArea.style.display = 'block';
             previewContainer.style.display = 'none';
@@ -686,7 +853,7 @@
 
         // 提取文字
         extractBtn.addEventListener('click', async () => {
-            if (!selectedFile) return;
+            if (selectedFiles.length === 0) return;
 
             const translateOption = translateSelect.value;
             extractBtn.disabled = true;
@@ -703,9 +870,13 @@
             }
 
             try {
-                // 轉換為 Base64
-                const base64 = await fileToBase64(selectedFile);
-                const base64Data = base64.split(',')[1]; // 移除 data:image/...;base64, 前綴
+                // 轉換所有圖片為 Base64
+                const base64Images = [];
+                for (const file of selectedFiles) {
+                    const base64 = await fileToBase64(file);
+                    const base64Data = base64.split(',')[1];
+                    base64Images.push(base64Data);
+                }
 
                 // 調用 API，包含翻譯選項和語言設置
                 const response = await fetch('/api/ocr', {
@@ -714,7 +885,7 @@
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                        image: base64Data,
+                        images: base64Images,
                         translate: translateOption,
                         sourceLanguage: selectedSourceLang,
                         targetLanguage: selectedTargetLang
@@ -731,9 +902,9 @@
                     let statsText = '';
                     if (data.data.stats.translationMethod && data.data.stats.translationMethod !== 'none') {
                         const method = data.data.stats.translationMethod === 'google' ? 'Google 翻譯' : 'OpenAI 翻譯';
-                        statsText = `${data.data.stats.translatedTextLength} 字元 (${method})`;
+                        statsText = `${data.data.stats.imageCount} 張圖片 | ${data.data.stats.translatedTextLength} 字元 (${method})`;
                     } else {
-                        statsText = `${data.data.stats.originalTextLength} 字元`;
+                        statsText = `${data.data.stats.imageCount} 張圖片 | ${data.data.stats.originalTextLength} 字元`;
                     }
                     resultStats.textContent = statsText;
 
