@@ -13,6 +13,7 @@
 
 import { GoogleOCRExtractor } from '../lib/ocr-google.js';
 import { GoogleTranslatorFree } from '../lib/translator-google.js';
+import { OpenAITranslator } from '../lib/translator.js';
 
 export default async function handler(req, res) {
   // 設置 CORS
@@ -96,34 +97,58 @@ export default async function handler(req, res) {
     let translatedSegments = [];
     let translationMethod = 'none';
 
-    if (translate === 'google') {
-      console.log(`開始翻譯（使用 Google 翻譯）...`);
+    if (translate && translate !== 'none') {
+      console.log(`開始翻譯（使用 ${translate}）...`);
 
       try {
+        // 獲取 OpenAI API Key（如果使用 OpenAI 翻譯）
+        const openaiApiKey = process.env.OPENAI_API_KEY;
+
         if (resultMode === 'segmented' && extractedSegments.length > 1) {
           // 分段翻譯
           for (const segment of extractedSegments) {
-            const translator = new GoogleTranslatorFree();
             let translated;
-            if (segment.length > 5000) {
-              translated = await translator.translateLongText(segment, { sourceLanguage, targetLanguage });
-            } else {
-              translated = await translator.translate(segment, { sourceLanguage, targetLanguage });
+            if (translate === 'google') {
+              const translator = new GoogleTranslatorFree();
+              if (segment.length > 5000) {
+                translated = await translator.translateLongText(segment, { sourceLanguage, targetLanguage });
+              } else {
+                translated = await translator.translate(segment, { sourceLanguage, targetLanguage });
+              }
+              translationMethod = 'google';
+            } else if (translate === 'openai') {
+              if (!openaiApiKey) {
+                throw new Error('缺少 OPENAI_API_KEY，無法使用 OpenAI 翻譯');
+              }
+              const translator = new OpenAITranslator(openaiApiKey);
+              const prompt = `請將以下文字翻譯成繁體中文，保持原始格式：\n\n${segment}`;
+              translated = await translator.translate(prompt, { preserveFormatting: true });
+              translationMethod = 'openai';
             }
             translatedSegments.push(translated);
           }
           translatedText = translatedSegments.join('\n\n');
-          translationMethod = 'google';
         } else {
           // 整體翻譯
-          const translator = new GoogleTranslatorFree();
-          if (extractedText.length > 5000) {
-            translatedText = await translator.translateLongText(extractedText, { sourceLanguage, targetLanguage });
-          } else {
-            translatedText = await translator.translate(extractedText, { sourceLanguage, targetLanguage });
+          if (translate === 'google') {
+            const translator = new GoogleTranslatorFree();
+            if (extractedText.length > 5000) {
+              translatedText = await translator.translateLongText(extractedText, { sourceLanguage, targetLanguage });
+            } else {
+              translatedText = await translator.translate(extractedText, { sourceLanguage, targetLanguage });
+            }
+            translatedSegments = [translatedText];
+            translationMethod = 'google';
+          } else if (translate === 'openai') {
+            if (!openaiApiKey) {
+              throw new Error('缺少 OPENAI_API_KEY，無法使用 OpenAI 翻譯');
+            }
+            const translator = new OpenAITranslator(openaiApiKey);
+            const prompt = `請將以下文字翻譯成繁體中文，保持原始格式：\n\n${extractedText}`;
+            translatedText = await translator.translate(prompt, { preserveFormatting: true });
+            translatedSegments = [translatedText];
+            translationMethod = 'openai';
           }
-          translatedSegments = [translatedText];
-          translationMethod = 'google';
         }
 
         console.log(`翻譯完成（${translatedText?.length || 0} 字元）`);
