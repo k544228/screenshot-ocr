@@ -204,46 +204,56 @@
             background: rgba(255, 68, 68, 1);
         }
 
-        .image-drag-handle {
+        .image-controls {
             position: absolute;
             bottom: 5px;
+            left: 5px;
             right: 5px;
+            display: flex;
+            gap: 5px;
+            justify-content: center;
+        }
+
+        .image-move-btn {
             background: rgba(102, 126, 234, 0.9);
             color: white;
+            border: none;
             width: 32px;
             height: 32px;
             border-radius: 6px;
             display: flex;
             align-items: center;
             justify-content: center;
-            cursor: grab;
-            font-size: 1.2em;
+            cursor: pointer;
+            font-size: 1.1em;
             font-weight: bold;
-            user-select: none;
             transition: all 0.2s ease;
         }
 
-        .image-drag-handle:hover {
+        .image-move-btn:hover {
             background: rgba(102, 126, 234, 1);
             transform: scale(1.1);
         }
 
-        .image-drag-handle:active {
-            cursor: grabbing;
+        .image-move-btn:active {
+            transform: scale(0.95);
         }
 
-        .image-drag-handle::before {
-            content: '⋮⋮';
-            letter-spacing: -2px;
+        .image-move-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .image-move-btn:disabled:hover {
+            transform: none;
         }
 
         /* 移動端優化 */
         @media (max-width: 600px) {
-            .image-drag-handle {
-                width: 40px;
-                height: 40px;
-                bottom: 8px;
-                right: 8px;
+            .image-move-btn {
+                width: 36px;
+                height: 36px;
+                font-size: 1.2em;
             }
         }
 
@@ -918,7 +928,7 @@
 
                 const countDiv = document.createElement('div');
                 countDiv.className = 'images-count';
-                countDiv.textContent = `已選擇 ${selectedFiles.length} 張圖片（可拖動調整順序）`;
+                countDiv.textContent = `已選擇 ${selectedFiles.length} 張圖片（使用 ▲▼ 調整順序）`;
 
                 const addMoreBtn = document.createElement('button');
                 addMoreBtn.className = 'add-more-btn';
@@ -942,31 +952,35 @@
                 reader.onload = (e) => {
                     const itemDiv = document.createElement('div');
                     itemDiv.className = 'image-item';
-                    itemDiv.draggable = true;
                     itemDiv.dataset.index = index;
+
+                    const isFirst = index === 0;
+                    const isLast = index === selectedFiles.length - 1;
 
                     itemDiv.innerHTML = `
                         <img src="${e.target.result}" alt="圖片 ${index + 1}">
                         <div class="image-order">${index + 1}</div>
                         <div class="image-remove" data-index="${index}">✕</div>
-                        <div class="image-drag-handle" title="拖動排序"></div>
+                        <div class="image-controls">
+                            <button class="image-move-btn" data-index="${index}" data-direction="up" ${isFirst ? 'disabled' : ''} title="上移">▲</button>
+                            <button class="image-move-btn" data-index="${index}" data-direction="down" ${isLast ? 'disabled' : ''} title="下移">▼</button>
+                        </div>
                     `;
-
-                    // 拖放事件（桌面端）
-                    itemDiv.addEventListener('dragstart', handleDragStart);
-                    itemDiv.addEventListener('dragover', handleDragOver);
-                    itemDiv.addEventListener('drop', handleDrop);
-                    itemDiv.addEventListener('dragend', handleDragEnd);
-
-                    // 觸摸事件（移動端）
-                    itemDiv.addEventListener('touchstart', handleTouchStart, { passive: false });
-                    itemDiv.addEventListener('touchmove', handleTouchMove, { passive: false });
-                    itemDiv.addEventListener('touchend', handleTouchEnd);
 
                     // 刪除按鈕
                     itemDiv.querySelector('.image-remove').addEventListener('click', (e) => {
                         e.stopPropagation();
                         removeImage(parseInt(e.target.dataset.index));
+                    });
+
+                    // 上移/下移按鈕
+                    itemDiv.querySelectorAll('.image-move-btn').forEach(btn => {
+                        btn.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            const idx = parseInt(btn.dataset.index);
+                            const direction = btn.dataset.direction;
+                            moveImage(idx, direction);
+                        });
                     });
 
                     gridDiv.appendChild(itemDiv);
@@ -985,105 +999,21 @@
             }
         }
 
-        // 拖放排序
-        let draggedElement = null;
-
-        function handleDragStart(e) {
-            draggedElement = e.currentTarget;
-            e.currentTarget.classList.add('dragging');
-        }
-
-        function handleDragOver(e) {
-            e.preventDefault();
-        }
-
-        function handleDrop(e) {
-            e.preventDefault();
-            const dropTarget = e.currentTarget;
-
-            if (draggedElement !== dropTarget) {
-                const dragIndex = parseInt(draggedElement.dataset.index);
-                const dropIndex = parseInt(dropTarget.dataset.index);
-
-                // 交換位置
-                const temp = selectedFiles[dragIndex];
-                selectedFiles[dragIndex] = selectedFiles[dropIndex];
-                selectedFiles[dropIndex] = temp;
-
+        // 圖片順序調整（上移/下移）
+        function moveImage(index, direction) {
+            if (direction === 'up' && index > 0) {
+                // 上移：與前一個交換
+                const temp = selectedFiles[index];
+                selectedFiles[index] = selectedFiles[index - 1];
+                selectedFiles[index - 1] = temp;
+                renderImagePreviews();
+            } else if (direction === 'down' && index < selectedFiles.length - 1) {
+                // 下移：與後一個交換
+                const temp = selectedFiles[index];
+                selectedFiles[index] = selectedFiles[index + 1];
+                selectedFiles[index + 1] = temp;
                 renderImagePreviews();
             }
-        }
-
-        function handleDragEnd(e) {
-            e.currentTarget.classList.remove('dragging');
-        }
-
-        // 觸摸拖動支持
-        let touchedElement = null;
-        let touchStartY = 0;
-        let currentY = 0;
-
-        function handleTouchStart(e) {
-            touchedElement = e.currentTarget;
-            const touch = e.touches[0];
-            touchStartY = touch.clientY;
-            touchedElement.classList.add('dragging');
-        }
-
-        function handleTouchMove(e) {
-            if (!touchedElement) return;
-            e.preventDefault();
-
-            const touch = e.touches[0];
-            currentY = touch.clientY;
-            const deltaY = currentY - touchStartY;
-
-            // 視覺反饋：移動元素
-            touchedElement.style.transform = `translateY(${deltaY}px)`;
-            touchedElement.style.zIndex = '1000';
-
-            // 檢測是否懸停在其他元素上
-            const elements = document.elementsFromPoint(touch.clientX, touch.clientY);
-            const targetItem = elements.find(el => el.classList.contains('image-item') && el !== touchedElement);
-
-            if (targetItem) {
-                // 高亮目標
-                document.querySelectorAll('.image-item').forEach(item => {
-                    if (item !== touchedElement) {
-                        item.style.opacity = item === targetItem ? '0.5' : '1';
-                    }
-                });
-            }
-        }
-
-        function handleTouchEnd(e) {
-            if (!touchedElement) return;
-
-            const touch = e.changedTouches[0];
-            const elements = document.elementsFromPoint(touch.clientX, touch.clientY);
-            const dropTarget = elements.find(el => el.classList.contains('image-item') && el !== touchedElement);
-
-            if (dropTarget) {
-                const dragIndex = parseInt(touchedElement.dataset.index);
-                const dropIndex = parseInt(dropTarget.dataset.index);
-
-                // 交換位置
-                const temp = selectedFiles[dragIndex];
-                selectedFiles[dragIndex] = selectedFiles[dropIndex];
-                selectedFiles[dropIndex] = temp;
-
-                renderImagePreviews();
-            }
-
-            // 重置樣式
-            touchedElement.classList.remove('dragging');
-            touchedElement.style.transform = '';
-            touchedElement.style.zIndex = '';
-            document.querySelectorAll('.image-item').forEach(item => {
-                item.style.opacity = '1';
-            });
-
-            touchedElement = null;
         }
 
         // 刪除圖片
