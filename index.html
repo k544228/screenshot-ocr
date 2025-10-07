@@ -78,8 +78,15 @@
         }
 
         .upload-hint {
-            color: #999;
-            font-size: 0.9em;
+            color: #666;
+            font-size: 0.95em;
+            margin-top: 8px;
+        }
+
+        .upload-hint-highlight {
+            color: #ff4444;
+            font-weight: bold;
+            font-size: 1.1em;
         }
 
         #imageInput {
@@ -472,7 +479,7 @@
         <div class="upload-area" id="uploadArea">
             <div class="upload-icon">📤</div>
             <div class="upload-text">點擊或拖放截圖到這裡</div>
-            <div class="upload-hint">支持 PNG、JPG、JPEG 格式（最多 10 張）</div>
+            <div class="upload-hint">支持 PNG、JPG、JPEG 格式（最多 <span class="upload-hint-highlight">10 張照片</span>）</div>
             <input type="file" id="imageInput" accept="image/png,image/jpeg,image/jpg" multiple>
         </div>
 
