@@ -35,7 +35,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { image, images, translate = 'none', targetLanguage = 'zh-TW', options = {} } = req.body;
+    const { image, images, translate = 'none', sourceLanguage = 'auto', targetLanguage = 'zh-TW', options = {} } = req.body;
 
     // 驗證輸入
     if (!image && !images) {
@@ -87,9 +87,9 @@ export default async function handler(req, res) {
         if (translate === 'google') {
           const translator = new GoogleTranslatorFree();
           if (extractedText.length > 5000) {
-            translatedText = await translator.translateLongText(extractedText);
+            translatedText = await translator.translateLongText(extractedText, { sourceLanguage, targetLanguage });
           } else {
-            translatedText = await translator.translate(extractedText, { targetLanguage });
+            translatedText = await translator.translate(extractedText, { sourceLanguage, targetLanguage });
           }
           translationMethod = 'google';
         } else if (translate === 'openai') {

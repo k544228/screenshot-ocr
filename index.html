@@ -260,6 +260,120 @@
             box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
         }
 
+        .language-selector {
+            margin-top: 15px;
+        }
+
+        .language-group {
+            display: flex;
+            gap: 15px;
+            margin-top: 10px;
+        }
+
+        .language-field {
+            flex: 1;
+        }
+
+        .language-field-label {
+            display: block;
+            margin-bottom: 5px;
+            color: #666;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+
+        .language-search-wrapper {
+            position: relative;
+        }
+
+        .language-search {
+            width: 100%;
+            padding: 10px 35px 10px 10px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 0.95em;
+            transition: all 0.3s ease;
+        }
+
+        .language-search:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .search-icon {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #999;
+            pointer-events: none;
+        }
+
+        .language-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 2px solid #667eea;
+            border-radius: 6px;
+            margin-top: 5px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1000;
+            display: none;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .language-dropdown.show {
+            display: block;
+        }
+
+        .language-option {
+            padding: 10px;
+            cursor: pointer;
+            transition: background 0.2s ease;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .language-option:hover {
+            background: #f8f9ff;
+        }
+
+        .language-option.selected {
+            background: #667eea;
+            color: white;
+        }
+
+        .language-option-name {
+            font-weight: 500;
+        }
+
+        .language-option-code {
+            font-size: 0.8em;
+            color: #999;
+        }
+
+        .language-option.selected .language-option-code {
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .no-results {
+            padding: 15px;
+            text-align: center;
+            color: #999;
+            font-size: 0.9em;
+        }
+
+        @media (max-width: 600px) {
+            .language-group {
+                flex-direction: column;
+                gap: 10px;
+            }
+        }
+
         @media (max-width: 600px) {
             .container {
                 padding: 20px;
@@ -297,6 +411,27 @@
                     <option value="none">不翻譯</option>
                     <option value="openai">OpenAI 翻譯（更準確，消耗 API）</option>
                 </select>
+
+                <div class="language-selector" id="languageSelector" style="display: none;">
+                    <div class="language-group">
+                        <div class="language-field">
+                            <label class="language-field-label">從</label>
+                            <div class="language-search-wrapper">
+                                <input type="text" class="language-search" id="sourceLangSearch" placeholder="搜尋語言..." value="自動檢測" readonly>
+                                <span class="search-icon">🔍</span>
+                                <div class="language-dropdown" id="sourceLangDropdown"></div>
+                            </div>
+                        </div>
+                        <div class="language-field">
+                            <label class="language-field-label">到</label>
+                            <div class="language-search-wrapper">
+                                <input type="text" class="language-search" id="targetLangSearch" placeholder="搜尋語言..." value="繁體中文" readonly>
+                                <span class="search-icon">🔍</span>
+                                <div class="language-dropdown" id="targetLangDropdown"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div class="button-group">
@@ -327,11 +462,41 @@
     </div>
 
     <script>
+        // 語言列表（按使用率排序）
+        const LANGUAGES = [
+            { code: 'auto', name: '自動檢測', nameEn: 'Auto Detect' },
+            { code: 'zh-TW', name: '繁體中文', nameEn: 'Traditional Chinese' },
+            { code: 'en', name: '英文', nameEn: 'English' },
+            { code: 'zh-CN', name: '簡體中文', nameEn: 'Simplified Chinese' },
+            { code: 'ja', name: '日文', nameEn: 'Japanese' },
+            { code: 'ko', name: '韓文', nameEn: 'Korean' },
+            { code: 'es', name: '西班牙文', nameEn: 'Spanish' },
+            { code: 'fr', name: '法文', nameEn: 'French' },
+            { code: 'de', name: '德文', nameEn: 'German' },
+            { code: 'pt', name: '葡萄牙文', nameEn: 'Portuguese' },
+            { code: 'ar', name: '阿拉伯文', nameEn: 'Arabic' },
+            { code: 'hi', name: '印地文', nameEn: 'Hindi' },
+            { code: 'id', name: '印尼文', nameEn: 'Indonesian' },
+            { code: 'it', name: '義大利文', nameEn: 'Italian' },
+            { code: 'ms', name: '馬來文', nameEn: 'Malay' },
+            { code: 'nl', name: '荷蘭文', nameEn: 'Dutch' },
+            { code: 'pl', name: '波蘭文', nameEn: 'Polish' },
+            { code: 'ru', name: '俄文', nameEn: 'Russian' },
+            { code: 'th', name: '泰文', nameEn: 'Thai' },
+            { code: 'tr', name: '土耳其文', nameEn: 'Turkish' },
+            { code: 'vi', name: '越南文', nameEn: 'Vietnamese' },
+        ];
+
         const uploadArea = document.getElementById('uploadArea');
         const imageInput = document.getElementById('imageInput');
         const previewContainer = document.getElementById('previewContainer');
         const previewImage = document.getElementById('previewImage');
         const translateSelect = document.getElementById('translateSelect');
+        const languageSelector = document.getElementById('languageSelector');
+        const sourceLangSearch = document.getElementById('sourceLangSearch');
+        const targetLangSearch = document.getElementById('targetLangSearch');
+        const sourceLangDropdown = document.getElementById('sourceLangDropdown');
+        const targetLangDropdown = document.getElementById('targetLangDropdown');
         const extractBtn = document.getElementById('extractBtn');
         const cancelBtn = document.getElementById('cancelBtn');
         const loading = document.getElementById('loading');
@@ -344,6 +509,113 @@
         const successDiv = document.getElementById('success');
 
         let selectedFile = null;
+        let selectedSourceLang = 'auto';
+        let selectedTargetLang = 'zh-TW';
+
+        // 語言搜尋功能
+        function searchLanguages(query) {
+            if (!query || query.trim() === '') return LANGUAGES;
+
+            const lowerQuery = query.toLowerCase().trim();
+            return LANGUAGES.filter(lang =>
+                lang.name.toLowerCase().includes(lowerQuery) ||
+                lang.nameEn.toLowerCase().includes(lowerQuery) ||
+                lang.code.toLowerCase().includes(lowerQuery)
+            );
+        }
+
+        // 渲染語言下拉選單
+        function renderLanguageDropdown(dropdown, languages, selectedCode, onSelect) {
+            dropdown.innerHTML = '';
+
+            if (languages.length === 0) {
+                dropdown.innerHTML = '<div class="no-results">找不到語言</div>';
+                return;
+            }
+
+            languages.forEach(lang => {
+                const option = document.createElement('div');
+                option.className = 'language-option' + (lang.code === selectedCode ? ' selected' : '');
+                option.innerHTML = `
+                    <span class="language-option-name">${lang.name}</span>
+                    <span class="language-option-code">${lang.nameEn}</span>
+                `;
+                option.addEventListener('click', () => onSelect(lang));
+                dropdown.appendChild(option);
+            });
+        }
+
+        // 翻譯選項改變
+        translateSelect.addEventListener('change', () => {
+            const showLanguages = translateSelect.value !== 'none';
+            languageSelector.style.display = showLanguages ? 'block' : 'none';
+        });
+
+        // 來源語言選擇器
+        sourceLangSearch.addEventListener('click', () => {
+            sourceLangSearch.removeAttribute('readonly');
+            sourceLangSearch.value = '';
+            sourceLangSearch.focus();
+            renderLanguageDropdown(sourceLangDropdown, LANGUAGES, selectedSourceLang, (lang) => {
+                selectedSourceLang = lang.code;
+                sourceLangSearch.value = lang.name;
+                sourceLangSearch.setAttribute('readonly', 'readonly');
+                sourceLangDropdown.classList.remove('show');
+            });
+            sourceLangDropdown.classList.add('show');
+        });
+
+        sourceLangSearch.addEventListener('input', (e) => {
+            const results = searchLanguages(e.target.value);
+            renderLanguageDropdown(sourceLangDropdown, results, selectedSourceLang, (lang) => {
+                selectedSourceLang = lang.code;
+                sourceLangSearch.value = lang.name;
+                sourceLangSearch.setAttribute('readonly', 'readonly');
+                sourceLangDropdown.classList.remove('show');
+            });
+        });
+
+        sourceLangSearch.addEventListener('blur', () => {
+            setTimeout(() => {
+                sourceLangDropdown.classList.remove('show');
+                const selectedLang = LANGUAGES.find(l => l.code === selectedSourceLang);
+                sourceLangSearch.value = selectedLang ? selectedLang.name : '自動檢測';
+                sourceLangSearch.setAttribute('readonly', 'readonly');
+            }, 200);
+        });
+
+        // 目標語言選擇器
+        targetLangSearch.addEventListener('click', () => {
+            targetLangSearch.removeAttribute('readonly');
+            targetLangSearch.value = '';
+            targetLangSearch.focus();
+            renderLanguageDropdown(targetLangDropdown, LANGUAGES.filter(l => l.code !== 'auto'), selectedTargetLang, (lang) => {
+                selectedTargetLang = lang.code;
+                targetLangSearch.value = lang.name;
+                targetLangSearch.setAttribute('readonly', 'readonly');
+                targetLangDropdown.classList.remove('show');
+            });
+            targetLangDropdown.classList.add('show');
+        });
+
+        targetLangSearch.addEventListener('input', (e) => {
+            const results = searchLanguages(e.target.value).filter(l => l.code !== 'auto');
+            renderLanguageDropdown(targetLangDropdown, results, selectedTargetLang, (lang) => {
+                selectedTargetLang = lang.code;
+                targetLangSearch.value = lang.name;
+                targetLangSearch.setAttribute('readonly', 'readonly');
+                targetLangDropdown.classList.remove('show');
+            });
+        });
+
+        targetLangSearch.addEventListener('blur', () => {
+            setTimeout(() => {
+                targetLangDropdown.classList.remove('show');
+                const selectedLang = LANGUAGES.find(l => l.code === selectedTargetLang);
+                targetLangSearch.value = selectedLang ? selectedLang.name : '繁體中文';
+                targetLangSearch.setAttribute('readonly', 'readonly');
+            }, 200);
+        });
 
         // 點擊上傳區域
         uploadArea.addEventListener('click', () => {
@@ -431,7 +703,7 @@
                 const base64 = await fileToBase64(selectedFile);
                 const base64Data = base64.split(',')[1]; // 移除 data:image/...;base64, 前綴
 
-                // 調用 API，包含翻譯選項
+                // 調用 API，包含翻譯選項和語言設置
                 const response = await fetch('/api/ocr', {
                     method: 'POST',
                     headers: {
@@ -440,7 +712,8 @@
                     body: JSON.stringify({
                         image: base64Data,
                         translate: translateOption,
-                        targetLanguage: 'zh-TW'
+                        sourceLanguage: selectedSourceLang,
+                        targetLanguage: selectedTargetLang
                     })
                 });
 
