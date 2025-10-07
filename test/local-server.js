@@ -5,8 +5,14 @@
 
 import 'dotenv/config';
 import http from 'http';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import translateHandler from '../api/translate.js';
+import ocrHandler from '../api/ocr.js';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 const PORT = process.env.PORT || 3000;
 
 // 簡單的路由處理
@@ -33,7 +39,20 @@ async function requestHandler(req, res) {
     // 路由
     if (req.url === '/api/translate' || req.url === '/api/translate/') {
       await translateHandler(req, res);
+    } else if (req.url === '/api/ocr' || req.url === '/api/ocr/') {
+      await ocrHandler(req, res);
     } else if (req.url === '/' || req.url === '/index.html') {
+      // 提供實際的 index.html 文件
+      const indexPath = path.join(__dirname, '..', 'index.html');
+      try {
+        const content = fs.readFileSync(indexPath, 'utf-8');
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end(content);
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'text/plain' });
+        res.end('Error loading index.html');
+      }
+    } else if (req.url === '/old' || req.url === '/old.html') {
       // 簡單的首頁
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end(`
@@ -180,11 +199,12 @@ async function requestHandler(req, res) {
 const server = http.createServer(requestHandler);
 
 server.listen(PORT, () => {
-  console.log('\n🚀 Perplexity 翻譯器 - 本地開發服務器');
+  console.log('\n🚀 截圖文字提取 - 本地開發服務器');
   console.log('='.repeat(50));
   console.log(`✓ 服務運行在: http://localhost:${PORT}`);
+  console.log(`✓ OCR 頁面: http://localhost:${PORT}/`);
+  console.log(`✓ API 端點: http://localhost:${PORT}/api/ocr`);
   console.log(`✓ API 端點: http://localhost:${PORT}/api/translate`);
-  console.log(`✓ Claude 模型: ${process.env.CLAUDE_MODEL || 'claude-sonnet-4-20250514'}`);
   console.log('='.repeat(50));
   console.log('\n按 Ctrl+C 停止服務器\n');
 });

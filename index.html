@@ -164,6 +164,49 @@
             background: rgba(255, 68, 68, 1);
         }
 
+        .image-drag-handle {
+            position: absolute;
+            bottom: 5px;
+            right: 5px;
+            background: rgba(102, 126, 234, 0.9);
+            color: white;
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: grab;
+            font-size: 1.2em;
+            font-weight: bold;
+            user-select: none;
+            transition: all 0.2s ease;
+        }
+
+        .image-drag-handle:hover {
+            background: rgba(102, 126, 234, 1);
+            transform: scale(1.1);
+        }
+
+        .image-drag-handle:active {
+            cursor: grabbing;
+        }
+
+        .image-drag-handle::before {
+            content: '⋮⋮';
+            letter-spacing: -2px;
+        }
+
+        /* 移動端優化 */
+        @media (max-width: 600px) {
+            .image-drag-handle {
+                width: 40px;
+                height: 40px;
+                bottom: 8px;
+                right: 8px;
+            }
+        }
+
         .images-count {
             text-align: center;
             color: #666;
@@ -247,6 +290,68 @@
             font-family: "Courier New", monospace;
             line-height: 1.6;
             color: #333;
+        }
+
+        .result-mode-options {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9ff;
+            border-radius: 10px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .result-segments {
+            background: #f8f9ff;
+            border: 1px solid #e0e0e0;
+            border-radius: 10px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .result-segment {
+            padding: 20px;
+            border-bottom: 2px solid #333;
+            position: relative;
+        }
+
+        .result-segment:last-child {
+            border-bottom: none;
+        }
+
+        .result-segment-title {
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 1em;
+        }
+
+        .result-segment-text {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-family: "Courier New", monospace;
+            line-height: 1.6;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .segment-copy-btn {
+            padding: 8px 16px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.3s ease;
+        }
+
+        .segment-copy-btn:hover {
+            background: #764ba2;
+            transform: translateY(-2px);
+        }
+
+        .segment-copy-btn:active {
+            transform: translateY(0);
         }
 
         .loading {
@@ -517,6 +622,14 @@
                 </div>
             </div>
 
+            <div class="result-mode-options" id="resultModeOptions" style="display: none;">
+                <label class="translate-label">📊 結果顯示模式</label>
+                <select class="translate-select" id="resultModeSelect">
+                    <option value="merged">合併顯示（全部文字一起複製）</option>
+                    <option value="segmented">分段顯示（可單獨複製每張圖片的文字）</option>
+                </select>
+            </div>
+
             <div class="button-group">
                 <button class="btn-primary" id="extractBtn">🔍 提取文字</button>
                 <button class="btn-secondary" id="cancelBtn">✕ 取消</button>
@@ -778,13 +891,19 @@
                         <img src="${e.target.result}" alt="圖片 ${index + 1}">
                         <div class="image-order">${index + 1}</div>
                         <div class="image-remove" data-index="${index}">✕</div>
+                        <div class="image-drag-handle" title="拖動排序"></div>
                     `;
 
-                    // 拖放事件
+                    // 拖放事件（桌面端）
                     itemDiv.addEventListener('dragstart', handleDragStart);
                     itemDiv.addEventListener('dragover', handleDragOver);
                     itemDiv.addEventListener('drop', handleDrop);
                     itemDiv.addEventListener('dragend', handleDragEnd);
+
+                    // 觸摸事件（移動端）
+                    itemDiv.addEventListener('touchstart', handleTouchStart, { passive: false });
+                    itemDiv.addEventListener('touchmove', handleTouchMove, { passive: false });
+                    itemDiv.addEventListener('touchend', handleTouchEnd);
 
                     // 刪除按鈕
                     itemDiv.querySelector('.image-remove').addEventListener('click', (e) => {
@@ -796,6 +915,14 @@
                 };
                 reader.readAsDataURL(file);
             });
+
+            // 顯示/隱藏結果顯示模式選項（僅多張圖片時顯示）
+            const resultModeOptions = document.getElementById('resultModeOptions');
+            if (selectedFiles.length > 1) {
+                resultModeOptions.style.display = 'block';
+            } else {
+                resultModeOptions.style.display = 'none';
+            }
         }
 
         // 拖放排序
@@ -829,6 +956,74 @@
 
         function handleDragEnd(e) {
             e.currentTarget.classList.remove('dragging');
+        }
+
+        // 觸摸拖動支持
+        let touchedElement = null;
+        let touchStartY = 0;
+        let currentY = 0;
+
+        function handleTouchStart(e) {
+            touchedElement = e.currentTarget;
+            const touch = e.touches[0];
+            touchStartY = touch.clientY;
+            touchedElement.classList.add('dragging');
+        }
+
+        function handleTouchMove(e) {
+            if (!touchedElement) return;
+            e.preventDefault();
+
+            const touch = e.touches[0];
+            currentY = touch.clientY;
+            const deltaY = currentY - touchStartY;
+
+            // 視覺反饋：移動元素
+            touchedElement.style.transform = `translateY(${deltaY}px)`;
+            touchedElement.style.zIndex = '1000';
+
+            // 檢測是否懸停在其他元素上
+            const elements = document.elementsFromPoint(touch.clientX, touch.clientY);
+            const targetItem = elements.find(el => el.classList.contains('image-item') && el !== touchedElement);
+
+            if (targetItem) {
+                // 高亮目標
+                document.querySelectorAll('.image-item').forEach(item => {
+                    if (item !== touchedElement) {
+                        item.style.opacity = item === targetItem ? '0.5' : '1';
+                    }
+                });
+            }
+        }
+
+        function handleTouchEnd(e) {
+            if (!touchedElement) return;
+
+            const touch = e.changedTouches[0];
+            const elements = document.elementsFromPoint(touch.clientX, touch.clientY);
+            const dropTarget = elements.find(el => el.classList.contains('image-item') && el !== touchedElement);
+
+            if (dropTarget) {
+                const dragIndex = parseInt(touchedElement.dataset.index);
+                const dropIndex = parseInt(dropTarget.dataset.index);
+
+                // 交換位置
+                const temp = selectedFiles[dragIndex];
+                selectedFiles[dragIndex] = selectedFiles[dropIndex];
+                selectedFiles[dropIndex] = temp;
+
+                renderImagePreviews();
+            }
+
+            // 重置樣式
+            touchedElement.classList.remove('dragging');
+            touchedElement.style.transform = '';
+            touchedElement.style.zIndex = '';
+            document.querySelectorAll('.image-item').forEach(item => {
+                item.style.opacity = '1';
+            });
+
+            touchedElement = null;
         }
 
         // 刪除圖片
@@ -885,6 +1080,11 @@
                     base64Images.push(base64Data);
                 }
 
+                // 獲取結果顯示模式（多張圖片時）
+                const resultMode = selectedFiles.length > 1
+                    ? document.getElementById('resultModeSelect').value
+                    : 'merged';
+
                 // 調用 API，包含翻譯選項和語言設置
                 const response = await fetch('/api/ocr', {
                     method: 'POST',
@@ -895,15 +1095,58 @@
                         images: base64Images,
                         translate: translateOption,
                         sourceLanguage: selectedSourceLang,
-                        targetLanguage: selectedTargetLang
+                        targetLanguage: selectedTargetLang,
+                        resultMode: resultMode
                     })
                 });
 
                 const data = await response.json();
 
                 if (data.success) {
-                    // 顯示結果（優先顯示翻譯文字）
-                    resultText.textContent = data.data.text;
+                    // 清空結果容器
+                    resultText.innerHTML = '';
+
+                    // 根據結果模式顯示
+                    if (resultMode === 'segmented' && data.data.segments && data.data.segments.length > 1) {
+                        // 分段顯示
+                        const segmentsContainer = document.createElement('div');
+                        segmentsContainer.className = 'result-segments';
+
+                        data.data.segments.forEach((segment, index) => {
+                            const segmentDiv = document.createElement('div');
+                            segmentDiv.className = 'result-segment';
+
+                            const titleDiv = document.createElement('div');
+                            titleDiv.className = 'result-segment-title';
+                            titleDiv.textContent = `📷 圖片 ${index + 1}`;
+
+                            const textDiv = document.createElement('div');
+                            textDiv.className = 'result-segment-text';
+                            textDiv.textContent = segment;
+
+                            const copyBtn = document.createElement('button');
+                            copyBtn.className = 'segment-copy-btn';
+                            copyBtn.textContent = '📋 複製此段';
+                            copyBtn.onclick = async () => {
+                                try {
+                                    await navigator.clipboard.writeText(segment);
+                                    showSuccess('✅ 已複製圖片 ' + (index + 1) + ' 的文字！');
+                                } catch (error) {
+                                    showError('複製失敗，請手動選擇文字複製');
+                                }
+                            };
+
+                            segmentDiv.appendChild(titleDiv);
+                            segmentDiv.appendChild(textDiv);
+                            segmentDiv.appendChild(copyBtn);
+                            segmentsContainer.appendChild(segmentDiv);
+                        });
+
+                        resultText.appendChild(segmentsContainer);
+                    } else {
+                        // 合併顯示
+                        resultText.textContent = data.data.text;
+                    }
 
                     // 顯示統計信息
                     let statsText = '';

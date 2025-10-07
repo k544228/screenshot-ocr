@@ -35,7 +35,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { image, images, translate = 'none', sourceLanguage = 'auto', targetLanguage = 'zh-TW', options = {} } = req.body;
+    const { image, images, translate = 'none', sourceLanguage = 'auto', targetLanguage = 'zh-TW', resultMode = 'merged', options = {} } = req.body;
 
     // 驗證輸入
     if (!image && !images) {
@@ -56,6 +56,7 @@ export default async function handler(req, res) {
 
     const extractor = new OCRExtractor(apiKey);
     let extractedText;
+    let extractedSegments = [];
     let imageCount = 1;
 
     // 單張圖片處理
@@ -66,37 +67,86 @@ export default async function handler(req, res) {
         ignoreImages: true,
         ...options
       });
+      extractedSegments = [extractedText];
     }
     // 多張圖片批量處理
     else if (images && Array.isArray(images)) {
       imageCount = images.length;
       console.log(`開始批量 OCR 處理（${imageCount} 張圖片）`);
-      extractedText = await extractor.extractFromMultipleImages(images);
+
+      // 根據結果模式決定處理方式
+      if (resultMode === 'segmented') {
+        // 分段模式：保留每張圖片的獨立結果
+        for (let i = 0; i < images.length; i++) {
+          const text = await extractor.extractText(images[i], {
+            preserveFormatting: true,
+            ignoreImages: true,
+            ...options
+          });
+          extractedSegments.push(text);
+
+          // 添加延遲避免 API 速率限制
+          if (i < images.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+        }
+        extractedText = extractedSegments.join('\n\n');
+      } else {
+        // 合併模式：使用原有的批量處理
+        extractedText = await extractor.extractFromMultipleImages(images);
+        extractedSegments = [extractedText];
+      }
     }
 
     console.log(`OCR 完成（提取 ${extractedText.length} 字元）`);
 
     // 翻譯處理
     let translatedText = null;
+    let translatedSegments = [];
     let translationMethod = 'none';
 
     if (translate && translate !== 'none') {
       console.log(`開始翻譯（使用 ${translate}）...`);
 
       try {
-        if (translate === 'google') {
-          const translator = new GoogleTranslatorFree();
-          if (extractedText.length > 5000) {
-            translatedText = await translator.translateLongText(extractedText, { sourceLanguage, targetLanguage });
-          } else {
-            translatedText = await translator.translate(extractedText, { sourceLanguage, targetLanguage });
+        if (resultMode === 'segmented' && extractedSegments.length > 1) {
+          // 分段翻譯
+          for (const segment of extractedSegments) {
+            let translated;
+            if (translate === 'google') {
+              const translator = new GoogleTranslatorFree();
+              if (segment.length > 5000) {
+                translated = await translator.translateLongText(segment, { sourceLanguage, targetLanguage });
+              } else {
+                translated = await translator.translate(segment, { sourceLanguage, targetLanguage });
+              }
+              translationMethod = 'google';
+            } else if (translate === 'openai') {
+              const translator = new OpenAITranslator(apiKey);
+              const prompt = `請將以下文字翻譯成繁體中文，保持原始格式：\n\n${segment}`;
+              translated = await translator.translate(prompt, { preserveFormatting: true });
+              translationMethod = 'openai';
+            }
+            translatedSegments.push(translated);
           }
-          translationMethod = 'google';
-        } else if (translate === 'openai') {
-          const translator = new OpenAITranslator(apiKey);
-          const prompt = `請將以下文字翻譯成繁體中文，保持原始格式：\n\n${extractedText}`;
-          translatedText = await translator.translate(prompt, { preserveFormatting: true });
-          translationMethod = 'openai';
+          translatedText = translatedSegments.join('\n\n');
+        } else {
+          // 整體翻譯
+          if (translate === 'google') {
+            const translator = new GoogleTranslatorFree();
+            if (extractedText.length > 5000) {
+              translatedText = await translator.translateLongText(extractedText, { sourceLanguage, targetLanguage });
+            } else {
+              translatedText = await translator.translate(extractedText, { sourceLanguage, targetLanguage });
+            }
+            translationMethod = 'google';
+          } else if (translate === 'openai') {
+            const translator = new OpenAITranslator(apiKey);
+            const prompt = `請將以下文字翻譯成繁體中文，保持原始格式：\n\n${extractedText}`;
+            translatedText = await translator.translate(prompt, { preserveFormatting: true });
+            translationMethod = 'openai';
+          }
+          translatedSegments = [translatedText];
         }
 
         console.log(`翻譯完成（${translatedText?.length || 0} 字元）`);
@@ -104,6 +154,7 @@ export default async function handler(req, res) {
         console.error('翻譯錯誤:', error);
         // 翻譯失敗不影響整體流程，返回原文
         translatedText = null;
+        translatedSegments = extractedSegments;
       }
     }
 
@@ -114,6 +165,7 @@ export default async function handler(req, res) {
         originalText: extractedText,
         translatedText: translatedText,
         text: translatedText || extractedText, // 優先返回翻譯文字
+        segments: translatedSegments.length > 0 ? translatedSegments : extractedSegments, // 分段結果
         stats: {
           imageCount,
           originalTextLength: extractedText.length,
