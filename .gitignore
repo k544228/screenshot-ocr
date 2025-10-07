@@ -20,3 +20,5 @@ Thumbs.db
 
 # 測試
 test/output/
+gen-lang-client-*.json
+test-google-vision.js
