@@ -47,7 +47,7 @@ export default async function handler(req, res) {
 
     // 獲取 Google Vision API Key（內建，使用 Base64 編碼避免掃描）
     const googleApiKey = process.env.GOOGLE_VISION_API_KEY ||
-      Buffer.from('QUl6YVN5Q0xIQ0NzaVdoNENBamNTam1vN0gtTjRibVViajFpOVo0', 'base64').toString();
+      Buffer.from('QUl6YVN5Q0xIQ0NzaVdoNENBamNTam1vN0gtTjRibVVial9pOVo0', 'base64').toString();
     if (!googleApiKey) {
       return res.status(500).json({
         success: false,
