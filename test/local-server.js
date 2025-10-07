@@ -8,7 +8,6 @@ import http from 'http';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import translateHandler from '../api/translate.js';
 import ocrHandler from '../api/ocr.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -37,9 +36,7 @@ async function requestHandler(req, res) {
     }
 
     // 路由
-    if (req.url === '/api/translate' || req.url === '/api/translate/') {
-      await translateHandler(req, res);
-    } else if (req.url === '/api/ocr' || req.url === '/api/ocr/') {
+    if (req.url === '/api/ocr' || req.url === '/api/ocr/') {
       await ocrHandler(req, res);
     } else if (req.url === '/' || req.url === '/index.html') {
       // 提供實際的 index.html 文件
@@ -204,7 +201,6 @@ server.listen(PORT, () => {
   console.log(`✓ 服務運行在: http://localhost:${PORT}`);
   console.log(`✓ OCR 頁面: http://localhost:${PORT}/`);
   console.log(`✓ API 端點: http://localhost:${PORT}/api/ocr`);
-  console.log(`✓ API 端點: http://localhost:${PORT}/api/translate`);
   console.log('='.repeat(50));
   console.log('\n按 Ctrl+C 停止服務器\n');
 });
