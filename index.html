@@ -1088,6 +1088,14 @@
                 const data = await response.json();
 
                 if (data.success) {
+                    // 檢查是否有提取到文字
+                    if (!data.data.text || data.data.text.trim() === '') {
+                        showError('⚠️ 圖片中未識別到文字，請確保圖片清晰且包含文字內容');
+                        loading.style.display = 'none';
+                        extractBtn.disabled = false;
+                        return;
+                    }
+
                     // 清空結果容器
                     resultText.innerHTML = '';
 
