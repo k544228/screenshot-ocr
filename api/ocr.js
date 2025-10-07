@@ -11,7 +11,7 @@
  * }
  */
 
-import { GoogleOCRExtractor } from '../lib/ocr-google.js';
+import { OCRExtractor } from '../lib/ocr.js';
 import { GoogleTranslatorFree } from '../lib/translator-google.js';
 import { OpenAITranslator } from '../lib/translator.js';
 
@@ -45,19 +45,29 @@ export default async function handler(req, res) {
       });
     }
 
-    // 獲取 Google Vision API Key（內建，Base64 編碼）
-    const googleApiKey = process.env.GOOGLE_VISION_API_KEY ||
-      Buffer.from('QUl6YVN5Q0xIQ0NzaVdoNENBamNTam1vN0gtTjRibVVial9pOVo0', 'base64').toString();
+    // 驗證 API 金鑰（內建，Base64 編碼）
+    const apiKey = process.env.OPENAI_API_KEY ||
+      Buffer.from('c2stcHJvai12bF9YWjZ2UzR4RVFxaFpkem1UZlJTNnRXLUdTei1WX3REM2V1aXBPNGRqMGhoWWtqNjNBQ1E2Wmo5UTNEeDVUeVpCRTEzZjFpNVQzQmxia0ZKQUlQbWMzV1RiNEwtTE9JcXRJei0xcDJZelN4UkNUYWFuckItYzdCSTVPamZ4QTB4YkkyZ3VFSFJscFdSTUlDN2ljNkY4NElLTUE=', 'base64').toString();
+    if (!apiKey) {
+      return res.status(500).json({
+        success: false,
+        error: '伺服器配置錯誤：缺少 OPENAI_API_KEY'
+      });
+    }
 
-    const extractor = new GoogleOCRExtractor(googleApiKey);
+    const extractor = new OCRExtractor(apiKey);
     let extractedText;
     let extractedSegments = [];
     let imageCount = 1;
 
     // 單張圖片處理
     if (image) {
-      console.log('開始 OCR 文字提取（Google Vision）...');
-      extractedText = await extractor.extractTextVision(image);
+      console.log('開始 OCR 文字提取...');
+      extractedText = await extractor.extractText(image, {
+        preserveFormatting: true,
+        ignoreImages: true,
+        ...options
+      });
       extractedSegments = [extractedText];
     }
     // 多張圖片批量處理
@@ -69,17 +79,21 @@ export default async function handler(req, res) {
       if (resultMode === 'segmented') {
         // 分段模式：保留每張圖片的獨立結果
         for (let i = 0; i < images.length; i++) {
-          const text = await extractor.extractTextVision(images[i]);
+          const text = await extractor.extractText(images[i], {
+            preserveFormatting: true,
+            ignoreImages: true,
+            ...options
+          });
           extractedSegments.push(text);
 
           // 添加延遲避免 API 速率限制
           if (i < images.length - 1) {
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            await new Promise(resolve => setTimeout(resolve, 500));
           }
         }
         extractedText = extractedSegments.join('\n\n');
       } else {
-        // 合併模式：使用批量處理
+        // 合併模式：使用原有的批量處理
         extractedText = await extractor.extractFromMultipleImages(images);
         extractedSegments = [extractedText];
       }
@@ -96,10 +110,6 @@ export default async function handler(req, res) {
       console.log(`開始翻譯（使用 ${translate}）...`);
 
       try {
-        // 獲取 OpenAI API Key（內建，Base64 編碼）
-        const openaiApiKey = process.env.OPENAI_API_KEY ||
-          Buffer.from('c2stcHJvai12bF9YWjZ2UzR4RVFxaFpkem1UZlJTNnRXLUdTei1WX3REM2V1aXBPNGRqMGhoWWtqNjNBQ1E2Wmo5UTNEeDVUeVpCRTEzZjFpNVQzQmxia0ZKQUlQbWMzV1RiNEwtTE9JcXRJei0xcDJZelN4UkNUYWFuckItYzdCSTVPamZ4QTB4YkkyZ3VFSFJscFdSTUlDN2ljNkY4NElLTUE=', 'base64').toString();
-
         if (resultMode === 'segmented' && extractedSegments.length > 1) {
           // 分段翻譯
           for (const segment of extractedSegments) {
@@ -113,7 +123,7 @@ export default async function handler(req, res) {
               }
               translationMethod = 'google';
             } else if (translate === 'openai') {
-              const translator = new OpenAITranslator(openaiApiKey);
+              const translator = new OpenAITranslator(apiKey);
               const prompt = `請將以下文字翻譯成繁體中文，保持原始格式：\n\n${segment}`;
               translated = await translator.translate(prompt, { preserveFormatting: true });
               translationMethod = 'openai';
@@ -132,7 +142,7 @@ export default async function handler(req, res) {
             }
             translationMethod = 'google';
           } else if (translate === 'openai') {
-            const translator = new OpenAITranslator(openaiApiKey);
+            const translator = new OpenAITranslator(apiKey);
             const prompt = `請將以下文字翻譯成繁體中文，保持原始格式：\n\n${extractedText}`;
             translatedText = await translator.translate(prompt, { preserveFormatting: true });
             translationMethod = 'openai';
